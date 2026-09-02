@@ -796,6 +796,7 @@ class BotGUI:
 
     def capture_image(self):
         self.set_state(BotStates.CAPTURING, "Watching...")
+        time.sleep(0.4)
         try:
             subprocess.run(["rpicam-still", "-t", "500", "-n", "--width", "640", "--height", "480", "-o", BMO_IMAGE_FILE], check=True)
             rotation = CURRENT_CONFIG.get("camera_rotation", 0)
