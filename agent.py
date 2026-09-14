@@ -839,6 +839,23 @@ class BotGUI:
         shutil.copy(img_path, saved_path)
         return saved_path
 
+    def adjust_volume(self, direction):
+        delta = "5%+" if direction == "up" else "5%-"
+        try:
+            subprocess.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", delta], check=True)
+            response = random.choice(["Done!", "Alright!", "Boom, done!", "There you go!"])
+        except Exception as e:
+            print(f"Volume Error: {e}")
+            response = "I couldn't change the volume."
+
+        self.set_state(BotStates.SPEAKING, "Speaking...")
+        self.append_to_text("BOT: ", newline=False)
+        self.append_to_text(response, newline=True)
+        with self.tts_queue_lock: self.tts_queue.append(response)
+        self.session_memory.append({"role": "assistant", "content": response})
+        self.wait_for_tts()
+        self.set_state(BotStates.IDLE, "Ready")
+
     # =========================================================================
     # 5. CHAT & RESPOND
     # =========================================================================
@@ -893,6 +910,20 @@ class BotGUI:
                 with self.tts_queue_lock: self.tts_queue.append(fallback_text)
                 self.wait_for_tts()
                 self.set_state(BotStates.IDLE, "Ready")
+                return
+
+            VOLUME_UP_PHRASES = ["volume up", "turn up the volume", "turn it up",
+                                  "increase the volume", "louder", "turn the volume up"]
+            VOLUME_DOWN_PHRASES = ["volume down", "turn down the volume", "turn it down",
+                                    "decrease the volume", "quieter", "turn the volume down",
+                                    "lower the volume"]
+
+            if any(p in lower_text for p in VOLUME_UP_PHRASES):
+                self.adjust_volume("up")
+                return
+
+            if any(p in lower_text for p in VOLUME_DOWN_PHRASES):
+                self.adjust_volume("down")
                 return
 
         model_to_use = VISION_MODEL if img_path else TEXT_MODEL
