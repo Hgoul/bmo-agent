@@ -26,6 +26,7 @@ import select
 import traceback
 import atexit
 import datetime
+import shutil
 import wave
 import struct 
 
@@ -186,8 +187,14 @@ You: {"action": "search_web", "value": "robots news"}
 User: What do you see right now?
 You: {"action": "capture_image", "value": "environment"}
 
-User: Take a photo.
+User: Take a look.
 You: {"action": "capture_image", "value": "environment"}
+
+User: Take a picture.
+You: {"action": "save_photo", "value": "photo"}
+
+User: Take a photo of me.
+You: {"action": "save_photo", "value": "photo"}
 
 ### END EXAMPLES ###
 """
@@ -459,17 +466,19 @@ class BotGUI:
         value = action_data.get("value") or action_data.get("query")
         
         VALID_TOOLS = {
-            "get_time", "search_web", "capture_image"
+            "get_time", "search_web", "capture_image", "save_photo"
         }
-        
+
         ALIASES = {
             "google": "search_web", "browser": "search_web", "news": "search_web",
-            "search_news": "search_web", "look": "capture_image", "see": "capture_image",
-            "check_time": "get_time",
-            "take_photo": "capture_image", "take_a_photo": "capture_image",
-            "photo": "capture_image", "picture": "capture_image",
-            "take_picture": "capture_image", "camera": "capture_image",
-            "snapshot": "capture_image", "look_around": "capture_image",
+            "search_news": "search_web", "check_time": "get_time",
+            # "Look at / describe what you see" -> analyze with the vision model
+            "look": "capture_image", "see": "capture_image", "look_around": "capture_image",
+            # "Take a picture" -> just capture, show it, and save it, no analysis
+            "take_photo": "save_photo", "take_a_photo": "save_photo",
+            "photo": "save_photo", "picture": "save_photo",
+            "take_picture": "save_photo", "take_a_picture": "save_photo",
+            "camera": "save_photo", "snapshot": "save_photo",
         }
 
         action = ALIASES.get(raw_action, raw_action)
@@ -523,6 +532,9 @@ class BotGUI:
         
         elif action == "capture_image":
              return "IMAGE_CAPTURE_TRIGGERED"
+
+        elif action == "save_photo":
+             return "SAVE_PHOTO_TRIGGERED"
 
         return None
 
@@ -816,6 +828,17 @@ class BotGUI:
             print(f"Camera Error: {e}")
             return None
 
+    def save_photo(self):
+        img_path = self.capture_image()
+        if not img_path:
+            return None
+        pictures_dir = "pictures_by_bmo"
+        os.makedirs(pictures_dir, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        saved_path = os.path.join(pictures_dir, f"photo_{timestamp}.jpg")
+        shutil.copy(img_path, saved_path)
+        return saved_path
+
     # =========================================================================
     # 5. CHAT & RESPOND
     # =========================================================================
@@ -898,7 +921,21 @@ class BotGUI:
                         new_img_path = self.capture_image()
                         if new_img_path:
                             self.chat_and_respond(text, img_path=new_img_path)
-                            return 
+                            return
+
+                    elif tool_result == "SAVE_PHOTO_TRIGGERED":
+                        saved_path = self.save_photo()
+                        self.thinking_sound_active.clear()
+                        if saved_path:
+                            cute_text = "Ooh, what a nice picture! Saving it."
+                            self.set_state(BotStates.SPEAKING, "Speaking...", cam_path=saved_path)
+                        else:
+                            cute_text = "I couldn't take the picture."
+                            self.set_state(BotStates.SPEAKING, "Speaking...", cam_path=img_path)
+                        self.append_to_text("BOT: ", newline=False)
+                        self.append_to_text(cute_text, newline=True)
+                        with self.tts_queue_lock: self.tts_queue.append(cute_text)
+                        self.session_memory.append({"role": "assistant", "content": cute_text})
 
                     elif tool_result == "INVALID_ACTION":
                         fallback_text = "I am not sure how to do that."
