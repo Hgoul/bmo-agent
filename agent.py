@@ -186,6 +186,9 @@ You: {"action": "search_web", "value": "robots news"}
 User: What do you see right now?
 You: {"action": "capture_image", "value": "environment"}
 
+User: Take a photo.
+You: {"action": "capture_image", "value": "environment"}
+
 ### END EXAMPLES ###
 """
 
@@ -460,9 +463,13 @@ class BotGUI:
         }
         
         ALIASES = {
-            "google": "search_web", "browser": "search_web", "news": "search_web",         
-            "search_news": "search_web", "look": "capture_image", "see": "capture_image", 
-            "check_time": "get_time"
+            "google": "search_web", "browser": "search_web", "news": "search_web",
+            "search_news": "search_web", "look": "capture_image", "see": "capture_image",
+            "check_time": "get_time",
+            "take_photo": "capture_image", "take_a_photo": "capture_image",
+            "photo": "capture_image", "picture": "capture_image",
+            "take_picture": "capture_image", "camera": "capture_image",
+            "snapshot": "capture_image", "look_around": "capture_image",
         }
 
         action = ALIASES.get(raw_action, raw_action)
