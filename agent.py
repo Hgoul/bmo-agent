@@ -853,6 +853,48 @@ class BotGUI:
             self.set_state(BotStates.IDLE, "Memory Wiped")
             return
 
+        # Deterministic fast-path for photo commands: the 1B model was too
+        # unreliable at picking the right JSON action for these two, so match
+        # the clear-cut phrasings directly instead of relying on it.
+        if img_path is None:
+            lower_text = text.lower()
+            SAVE_PHOTO_PHRASES = ["take a picture", "take a photo", "take my picture",
+                                   "take my photo", "take picture", "take photo",
+                                   "snap a photo", "snap a picture"]
+            LOOK_PHRASES = ["what do you see", "what can you see", "take a look",
+                             "look around", "describe what you see"]
+
+            if any(p in lower_text for p in SAVE_PHOTO_PHRASES):
+                self.set_state(BotStates.THINKING, "Thinking...")
+                saved_path = self.save_photo()
+                if saved_path:
+                    cute_text = "Ooh, what a nice picture! Saving it."
+                    self.set_state(BotStates.SPEAKING, "Speaking...", cam_path=saved_path)
+                else:
+                    cute_text = "I couldn't take the picture."
+                    self.set_state(BotStates.SPEAKING, "Speaking...")
+                self.append_to_text("BOT: ", newline=False)
+                self.append_to_text(cute_text, newline=True)
+                with self.tts_queue_lock: self.tts_queue.append(cute_text)
+                self.session_memory.append({"role": "assistant", "content": cute_text})
+                self.wait_for_tts()
+                self.set_state(BotStates.IDLE, "Ready")
+                return
+
+            if any(p in lower_text for p in LOOK_PHRASES):
+                new_img_path = self.capture_image()
+                if new_img_path:
+                    self.chat_and_respond(text, img_path=new_img_path)
+                    return
+                fallback_text = "I couldn't see anything, sorry."
+                self.set_state(BotStates.SPEAKING, "Speaking...")
+                self.append_to_text("BOT: ", newline=False)
+                self.append_to_text(fallback_text, newline=True)
+                with self.tts_queue_lock: self.tts_queue.append(fallback_text)
+                self.wait_for_tts()
+                self.set_state(BotStates.IDLE, "Ready")
+                return
+
         model_to_use = VISION_MODEL if img_path else TEXT_MODEL
         self.set_state(BotStates.THINKING, "Thinking...", cam_path=img_path)
         
