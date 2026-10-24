@@ -51,6 +51,8 @@ from ddgs import DDGS
 CONFIG_FILE = "config.json"
 MEMORY_FILE = "memory.json"
 BMO_IMAGE_FILE = "current_image.jpg"
+SPEECH_LOG_DIR = "speech"
+SPEECH_LOG_FILE = os.path.join(SPEECH_LOG_DIR, "conversations.txt")
 WAKE_WORD_MODEL = "./wakeword.onnx"
 WAKE_WORD_THRESHOLD = 0.5
 WHISPER_MODEL_SIZE = "base.en"  # tiny.en is faster/less accurate, small.en is slower/more accurate
@@ -436,7 +438,16 @@ class BotGUI:
                 self.overlay_label.place_forget()
         self.master.after(0, _update)
 
+    def log_speech(self, text):
+        try:
+            os.makedirs(SPEECH_LOG_DIR, exist_ok=True)
+            with open(SPEECH_LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(text)
+        except Exception as e:
+            print(f"Speech Log Error: {e}", flush=True)
+
     def append_to_text(self, text, newline=True):
+        self.log_speech(text + ("\n" if newline else ""))
         def _update():
             self.response_text.config(state=tk.NORMAL)
             if newline: 
@@ -450,6 +461,7 @@ class BotGUI:
         self.master.after(0, _update)
 
     def _stream_to_text(self, chunk):
+        self.log_speech(chunk)
         def update_text_stream():
             self.response_text.config(state=tk.NORMAL)
             self.response_text.insert(tk.END, chunk)
@@ -573,6 +585,7 @@ class BotGUI:
                     self.set_state(BotStates.IDLE, "Transcription empty.")
                     continue
                 
+                self.log_speech(f"\n=== {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===\n")
                 self.append_to_text(f"YOU: {user_text}")
                 self.interrupted.clear()
                 self.chat_and_respond(user_text, img_path=None)
@@ -864,7 +877,8 @@ class BotGUI:
             self.session_memory = []
             self.permanent_memory = [{"role": "system", "content": SYSTEM_PROMPT}]
             self.save_chat_history()
-            with self.tts_queue_lock: 
+            self.append_to_text("BOT: Okay. Memory wiped.")
+            with self.tts_queue_lock:
                 self.tts_queue.append("Okay. Memory wiped.")
             self.set_state(BotStates.IDLE, "Memory Wiped")
             return
