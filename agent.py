@@ -78,8 +78,7 @@ OLLAMA_OPTIONS = {
     'temperature': 0.5,
     'top_k': 40,
     'top_p': 0.9,
-    'num_predict': 100,
-    'stop': ['...', '…']
+    'num_predict': 100
 }
 
 def load_config():
@@ -131,6 +130,13 @@ if INPUT_DEVICE_NAME is not None:
         print(f"[AUDIO] Using input device: {device_info.get('name', INPUT_DEVICE_NAME)}", flush=True)
     except Exception:
         print(f"[AUDIO] Using input device index: {INPUT_DEVICE_NAME}", flush=True)
+
+def strip_ellipsis(text):
+    # The LLM likes to pepper replies with "..."/"…" between words when
+    # rambling - drop them so neither the screen nor Piper's TTS pause on
+    # them, without cutting generation short.
+    cleaned = re.sub(r'\.{2,}|…', ' ', text)
+    return re.sub(r' {2,}', ' ', cleaned)
 
 def choose_input_samplerate(device, preferred=None):
     candidates = []
@@ -980,6 +986,9 @@ class BotGUI:
 
                 if is_action_mode: continue
 
+                content = strip_ellipsis(content)
+                if not content: continue
+
                 self.thinking_sound_active.clear()
                 if self.current_state != BotStates.SPEAKING:
                     self.set_state(BotStates.SPEAKING, "Speaking...", cam_path=img_path)
@@ -1074,7 +1083,7 @@ class BotGUI:
                         self.thinking_sound_active.set()
                         
                         final_resp = ollama.chat(model=model_to_use, messages=summary_prompt, stream=False, options=OLLAMA_OPTIONS)
-                        final_text = final_resp['message']['content']
+                        final_text = strip_ellipsis(final_resp['message']['content'])
                         
                         self.thinking_sound_active.clear()
                         self.set_state(BotStates.SPEAKING, "Speaking...", cam_path=img_path)
