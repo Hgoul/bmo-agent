@@ -663,8 +663,7 @@ class BotGUI:
                         raise StopIteration("PTT")
 
                     rlist, _, _ = select.select([sys.stdin], [], [], 0.001)
-                    if rlist: 
-                        sys.stdin.readline()
+                    if rlist and sys.stdin.readline():
                         raise StopIteration("CLI")
 
                     # If fallback mode (blocksize 0), read fixed amount
