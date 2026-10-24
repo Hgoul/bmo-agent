@@ -883,6 +883,32 @@ class BotGUI:
         self.wait_for_tts()
         self.set_state(BotStates.IDLE, "Ready")
 
+    def do_web_search(self, query):
+        self.set_state(BotStates.THINKING, "Reading...")
+        tool_result = self.execute_action_and_get_result({"action": "search_web", "value": query})
+
+        if tool_result == "SEARCH_EMPTY":
+            response = "I searched, but I couldn't find anything about that."
+        elif tool_result == "SEARCH_ERROR":
+            response = "I cannot reach the internet right now."
+        elif tool_result:
+            summary_prompt = [
+                {"role": "system", "content": "Summarize this result in one short, plain sentence. No ellipses or trailing pauses. Do not explain your reasoning."},
+                {"role": "user", "content": f"RESULT: {tool_result}\nUser Question: {query}"}
+            ]
+            final_resp = ollama.chat(model=TEXT_MODEL, messages=summary_prompt, stream=False, options=OLLAMA_OPTIONS)
+            response = strip_ellipsis(final_resp['message']['content'])
+        else:
+            response = "I couldn't find anything about that."
+
+        self.set_state(BotStates.SPEAKING, "Speaking...")
+        self.append_to_text("BOT: ", newline=False)
+        self.append_to_text(response, newline=True)
+        with self.tts_queue_lock: self.tts_queue.append(response)
+        self.session_memory.append({"role": "assistant", "content": response})
+        self.wait_for_tts()
+        self.set_state(BotStates.IDLE, "Ready")
+
     # =========================================================================
     # 5. CHAT & RESPOND
     # =========================================================================
@@ -953,6 +979,17 @@ class BotGUI:
             if any(p in lower_text for p in VOLUME_DOWN_PHRASES):
                 self.adjust_volume("down")
                 return
+
+            SEARCH_PHRASES = ["search the web for", "search for", "look up",
+                               "can you search for", "can you look up", "google "]
+            for phrase in SEARCH_PHRASES:
+                idx = lower_text.find(phrase)
+                if idx != -1:
+                    query = text[idx + len(phrase):].strip(" ?.!")
+                    if query:
+                        self.do_web_search(query)
+                        return
+                    break
 
         model_to_use = VISION_MODEL if img_path else TEXT_MODEL
         self.set_state(BotStates.THINKING, "Thinking...", cam_path=img_path)
