@@ -980,8 +980,12 @@ class BotGUI:
                 self.adjust_volume("down")
                 return
 
-            SEARCH_PHRASES = ["search the web for", "search for", "look up",
-                               "can you search for", "can you look up", "google "]
+            SEARCH_PHRASES = ["search the web for", "search on the web for",
+                               "search up for", "search for", "search up",
+                               "can you search for", "can you look up",
+                               "can you find information about",
+                               "find information about", "find out about",
+                               "find news about", "look up", "google "]
             for phrase in SEARCH_PHRASES:
                 idx = lower_text.find(phrase)
                 if idx != -1:
