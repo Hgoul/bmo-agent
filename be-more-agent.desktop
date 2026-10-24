@@ -2,8 +2,9 @@
 Type=Application
 Name=Be More Agent
 Comment=Launch the Be More Agent
-Exec=/home/pi/be-more-agent/start_agent.sh
-Path=/home/pi/be-more-agent
-Icon=/home/pi/be-more-agent/faces/idle/idle_0.png
-Terminal=true
+Exec=/home/bmo/be-more-agent/start_agent.sh
+Path=/home/bmo/be-more-agent
+Icon=/home/bmo/be-more-agent/faces/idle/idle_0.png
+Terminal=false
 Categories=Utility;
+X-GNOME-Autostart-enabled=true
