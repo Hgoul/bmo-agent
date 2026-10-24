@@ -73,11 +73,13 @@ DEFAULT_CONFIG = {
 
 # LLM SETTINGS
 OLLAMA_OPTIONS = {
-    'keep_alive': '-1',     
+    'keep_alive': '-1',
     'num_thread': 4,
-    'temperature': 0.7,     
+    'temperature': 0.5,
     'top_k': 40,
-    'top_p': 0.9
+    'top_p': 0.9,
+    'num_predict': 100,
+    'stop': ['...', '…']
 }
 
 def load_config():
