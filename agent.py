@@ -506,7 +506,10 @@ class BotGUI:
 
         if action == "get_time":
             now = datetime.datetime.now().strftime("%I:%M %p")
-            return f"The current time is {now}."
+            # DIRECT_SPEAK:: skips the LLM summarization step entirely - the
+            # 1B model was mangling/hallucinating the time when asked to
+            # "summarize" it, even though it was handed the correct value.
+            return f"DIRECT_SPEAK::The current time is {now}."
         
         elif action == "search_web":
             print(f"Searching web for: {value}...", flush=True)
@@ -1050,9 +1053,18 @@ class BotGUI:
                         self.append_to_text(fallback_text, newline=True)
                         with self.tts_queue_lock: self.tts_queue.append(fallback_text)
 
+                    elif tool_result and tool_result.startswith("DIRECT_SPEAK::"):
+                        direct_text = tool_result.split("::", 1)[1]
+                        self.thinking_sound_active.clear()
+                        self.set_state(BotStates.SPEAKING, "Speaking...", cam_path=img_path)
+                        self.append_to_text("BOT: ", newline=False)
+                        self.append_to_text(direct_text, newline=True)
+                        with self.tts_queue_lock: self.tts_queue.append(direct_text)
+                        self.session_memory.append({"role": "assistant", "content": direct_text})
+
                     elif tool_result:
                         summary_prompt = [
-                            {"role": "system", "content": "Summarize this result in one short sentence."},
+                            {"role": "system", "content": "Summarize this result in one short, plain sentence. No ellipses or trailing pauses. Do not explain your reasoning."},
                             {"role": "user", "content": f"RESULT: {tool_result}\nUser Question: {text}"}
                         ]
                         
@@ -1201,7 +1213,14 @@ class BotGUI:
     def load_chat_history(self):
         if os.path.exists(MEMORY_FILE):
             try:
-                with open(MEMORY_FILE, "r") as f: return json.load(f)
+                with open(MEMORY_FILE, "r") as f:
+                    history = json.load(f)
+                # Always use the current SYSTEM_PROMPT, not whatever was saved
+                # to disk last time — otherwise edits to the prompt never take
+                # effect for an existing memory.json.
+                if history and history[0].get("role") == "system":
+                    history[0] = {"role": "system", "content": SYSTEM_PROMPT}
+                return history
             except: pass
         return [{"role": "system", "content": SYSTEM_PROMPT}]
 
